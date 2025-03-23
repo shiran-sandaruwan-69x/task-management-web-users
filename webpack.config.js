@@ -28,7 +28,7 @@ module.exports = {
             index: "/index.html",
         },
     },
-    name: "top-nav",
+    name: "taskManagement",
     module: {
         rules: [
             {
@@ -80,11 +80,6 @@ module.exports = {
                 "react-router-dom": {
                     singleton: true,
                     requiredVersion: dependencies["react-router-dom"],
-                    eager: true
-                },
-                "tempo-devtools": {
-                    singleton: true,
-                    requiredVersion: dependencies["tempo-devtools"],
                     eager: true
                 },
                 "antd": {

@@ -1,212 +1,227 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Plus, Search } from "lucide-react";
-import { Button, Input, Pagination, Modal, Col, Row } from "antd";
+import {Search, Shield} from "lucide-react";
+import {Input, Pagination, Modal, Col, Row, DatePicker, Select} from "antd";
 import TaskList from "./TaskList";
 import TaskForm from "./TaskForm";
-import DeleteAlertModal from "@/components/common-comp/DeleteAlertModal.tsx";
+import {
+  TaskFilteredValuesType,
+  TaskResApiValuesType,
+  TaskResValuesType, UserRolesType
+} from "@/components/tasks/task-types/TaskTypes.ts";
+import {getAllTaskByUserId, getAllTasksApi} from "@/services/task-services/TaskServices.ts";
+import {CommonErrorType} from "@/components/common-types/CommonTypes.ts";
+import {toast} from "react-toastify";
+import useDebounce from "@/components/common-comp/useDebounce.tsx";
+import {CalendarOutlined} from "@ant-design/icons";
+import moment from "moment/moment";
+import {SignInResType} from "@/components/common-types/AuthTypes.ts";
 
-interface Task {
-  id: string;
-  title: string;
-  assignee: {
-    id: string;
-    name: string;
-    email: string;
-  };
-  startDate: string;
-  endDate: string;
-  description: string;
-}
+const { Option } = Select;
 
-const TaskManagement = () => {
+const TaskManagement: React.FC  = () => {
   const [isTableLoading, setTableLoading] = useState<boolean>(false);
-  const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
   const [isEditFormOpen, setIsEditFormOpen] = useState<boolean>(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState<boolean>(false);
-  const [editingTask, setEditingTask] = useState<Task>(null);
-  const [deleteTask, setDeleteTask] = useState<Task>(null);
-  const [allTasks, setAllTasks] = useState( [
-    {
-      id: "1",
-      title: "Complete project documentation",
-      assignee: {
-        id: "user1",
-        name: "John Doe",
-        email: "john.doe@example.com",
-      },
-      startDate: "2025-03-10",
-      endDate: "2025-04-14",
-      description: "Write comprehensive documentation for the new feature.",
-    },
-    {
-      id: "2",
-      title: "Review pull requests",
-      assignee: {
-        id: "user2",
-        name: "Jane Smith",
-        email: "jane.smith@example.com",
-      },
-      startDate: "2025-03-10",
-      endDate: "2025-04-14",
-      description: "Review and approve pending pull requests for the sprint.",
-    },
-    {
-      id: "3",
-      title: "Deploy application to production",
-      assignee: {
-        id: "user3",
-        name: "Alex Johnson",
-        email: "alex.johnson@example.com",
-      },
-      startDate: "2025-03-10",
-      endDate: "2025-04-14",
-      description:
-          "Deploy the latest version of the application to production servers.",
-    },
-    {
-      id: "4",
-      title: "Implement user authentication",
-      assignee: {
-        id: "user1",
-        name: "John Doe",
-        email: "john.doe@example.com",
-      },
-      startDate: "2025-03-10",
-      endDate: "2025-04-14",
-      description: "Implement OAuth2 authentication for the application.",
-    },
-    {
-      id: "5",
-      title: "Fix navigation bug",
-      assignee: {
-        id: "user2",
-        name: "Jane Smith",
-        email: "jane.smith@example.com",
-      },
-      startDate: "2025-03-10",
-      endDate: "2025-04-14",
-      description: "Fix the navigation bug in the mobile view.",
-    },
-    {
-      id: "6",
-      title: "Update dependencies",
-      assignee: {
-        id: "user3",
-        name: "Alex Johnson",
-        email: "alex.johnson@example.com",
-      },
-      startDate: "2025-03-10",
-      endDate: "2025-04-14",
-      description: "Update all dependencies to their latest versions.",
-    },
-    {
-      id: "7",
-      title: "Create user dashboard",
-      assignee: {
-        id: "user1",
-        name: "John Doe",
-        email: "john.doe@example.com",
-      },
-      startDate: "2025-03-10",
-      endDate: "2025-04-14",
-      description: "Design and implement the user dashboard.",
-    },
-    {
-      id: "8",
-      title: "Write unit tests",
-      assignee: {
-        id: "user2",
-        name: "Jane Smith",
-        email: "jane.smith@example.com",
-      },
-      startDate: "2025-03-10",
-      endDate: "2025-04-14",
-      description: "Write unit tests for the new features.",
-    },
-  ]);
+  const [editingTask, setEditingTask] = useState<TaskResValuesType>(null);
+  const [allTasks, setAllTasks] = useState( []);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
 
   // Search state
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchTaskName, setTaskName] = useState("");
+  const [searchUserName, setUserName] = useState("");
+  const [searchEndDate, setEndDate] = useState<moment.Moment | null>(null);
+  const [searchStartDate, setStartDate] = useState<moment.Moment | null>(null);
+  const [searchDescription, setDescription] = useState("");
+  const [searchStatus, setSearchStatus] = useState("Select status");
 
-  const toggleModal = () => setIsFormOpen(!isFormOpen);
   const toggleEditModal = () => setIsEditFormOpen(!isEditFormOpen);
-  const toggleDeleteModal = () => setIsDeleteDialogOpen(!isDeleteDialogOpen);
 
-  // Filter tasks based on search query
-  const filteredTasks = useMemo(() => {
-    return allTasks.filter(
-        (task) =>
-            task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            task.startDate.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            task.endDate.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [allTasks, searchQuery]);
+  const savedUser = localStorage.getItem("user");
+  const parsedUser:SignInResType = JSON.parse(savedUser);
 
-  // Paginate tasks
-  const paginatedTasks = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return filteredTasks.slice(startIndex, endIndex);
-  }, [filteredTasks, currentPage, itemsPerPage]);
+  const isUserStatus:UserRolesType[] = [
+    { id: "complete", name: "Complete" },
+    { id: "pending", name: "Pending" }
+  ];
 
-  useEffect(()=>{
-    setTableLoading(true);
-  },[])
+  const [filteredValues, setFilteredValues] = useState<TaskFilteredValuesType>({
+    taskName:null,
+      firstName:null,
+    endDate:null,
+    startDate:null,
+    status:null,
+    description:null
+  });
 
-  const handleCreateTask = () => {
-    setEditingTask(null);
-    toggleModal();
-  };
+  const debouncedFilter = useDebounce<TaskFilteredValuesType>(filteredValues, 1000);
 
-  const handleEditTask = (record: Task) => {
+  useEffect(() => {
+    if (debouncedFilter) changePageNoOrPageSize(filteredValues);
+  }, [debouncedFilter]);
+
+  const handleEditTask = (record: TaskResValuesType) => {
     setEditingTask(record);
     toggleEditModal();
-  };
-
-  const handleDeleteTask = (record: Task) => {
-    setDeleteTask(record);
-    toggleDeleteModal();
   };
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
 
-  const confirmDelete = () => {
-    toggleDeleteModal();
-  };
+  const getAllTasks = async ()=>{
+    try {
+      const userId = parsedUser?.user?._id ?? null;
+      const response:TaskResApiValuesType = await getAllTaskByUserId(userId,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          currentPage,
+          itemsPerPage
+      );
+      const data:TaskResValuesType[] = response.data.map((records:TaskResValuesType)=>({
+        ...records,
+        assignee:records?.assignUser?.firstName,
+        startDate: moment(records.startDate).format("YYYY-MM-DD"),
+        completeDate: moment(records.completeDate).format("YYYY-MM-DD"),
+        endDate: moment(records.endDate).format("YYYY-MM-DD")
+      }))
+      setAllTasks(data);
+    }catch (error){
+      const isErrorResponse = (error: unknown): error is CommonErrorType => {
+        return typeof error === 'object' && error !== null && 'response' in error;
+      };
+      if (isErrorResponse(error) && error.response) {
+        toast.error(error?.response?.data?.message);
+      } else {
+        toast.error('Internal server error');
+      }
+    }
+  }
+
+  const changePageNoOrPageSize = async (filteredValues: TaskFilteredValuesType) => {
+    try {
+      const userId = parsedUser?.user?._id ?? null;
+      const response:TaskResApiValuesType = await getAllTaskByUserId(userId,
+          filteredValues.taskName,
+          null,
+          null,
+          filteredValues.startDate,
+          filteredValues.endDate,
+          null,
+          filteredValues.status,
+          currentPage,
+          itemsPerPage
+          );
+      const data:TaskResValuesType[] = response.data.map((records:TaskResValuesType)=>({
+        ...records,
+        assignee:records?.assignUser?.firstName,
+        startDate: moment(records.startDate).format("YYYY-MM-DD"),
+        completeDate: moment(records.completeDate).format("YYYY-MM-DD"),
+        endDate: moment(records.endDate).format("YYYY-MM-DD")
+      }))
+      setAllTasks(data);
+    }catch (error){
+      const isErrorResponse = (error: unknown): error is CommonErrorType => {
+        return typeof error === 'object' && error !== null && 'response' in error;
+      };
+      if (isErrorResponse(error) && error.response) {
+        toast.error(error?.response?.data?.message);
+      } else {
+        toast.error('Internal server error');
+      }
+    }
+  }
 
   return (
       <div className="container mx-auto p-6 bg-gray-50">
         <h1 className="text-3xl font-bold mb-8 text-gray-800">Task Management</h1>
 
         <div className="flex justify-between items-center mb-6">
-          <Row className="w-full">
-            <Col xs={12} sm={8}>
+          <Row className="w-full flex gap-1">
+            <Col xs={12} md={8} lg={5} xl={3}>
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                  placeholder="Search tasks..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8"
+                  placeholder="Task Name"
+                  value={searchTaskName}
+                  onChange={(e) => {
+                    setTaskName(e.target.value)
+                    setFilteredValues({
+                      ...filteredValues,
+                      taskName: e.target.value
+                    });
+                  }}
               />
             </Col>
-            <Col xs={12} sm={16} className="flex justify-end">
-              <Button onClick={handleCreateTask} className="flex items-center gap-2">
-                <Plus className="h-4 w-4" /> Create Task
-              </Button>
+            <Col xs={12} md={8} lg={5} xl={3}>
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <DatePicker
+                  style={{ width: "100%" }}
+                  value={searchStartDate}
+                  suffixIcon={<CalendarOutlined />}
+                  placeholder="Start Date"
+                  allowClear
+                  onChange={(date: moment.Moment | null) => {
+                    setStartDate(date);
+                    setFilteredValues({
+                      ...filteredValues,
+                      startDate: date ? date.format("YYYY-MM-DD") : null,
+                    });
+                  }}
+              />
+            </Col>
+            <Col xs={12} md={8} lg={5} xl={3}>
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <DatePicker
+                  style={{ width: "100%" }}
+                  value={searchEndDate}
+                  suffixIcon={<CalendarOutlined />}
+                  placeholder="End Date"
+                  allowClear
+                  onChange={(date: moment.Moment | null) => {
+                    setEndDate(date);
+                    setFilteredValues({
+                      ...filteredValues,
+                      endDate: date ? date.format("YYYY-MM-DD") : null
+                    });
+                  }}
+              />
+            </Col>
+            <Col xs={24} md={8} lg={5} xl={4}>
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Select
+                  className="w-full"
+                  prefix={<Shield size={18}/>}
+                  placeholder="Select a status"
+                  value={searchStatus}
+                  allowClear
+                  onChange={(value: string) => {
+                    const status:string = value === undefined ? null : value === "complete" ? "complete" : "pending";
+                    setSearchStatus(value);
+                    setFilteredValues({
+                      ...filteredValues,
+                      status: status
+                    });
+                  }}
+              >
+                {isUserStatus.map((user: UserRolesType) => (
+                    <Option key={user.id} value={user.id}>
+                      {user.name}
+                    </Option>
+                ))}
+              </Select>
             </Col>
           </Row>
         </div>
 
         <TaskList
-            tasks={paginatedTasks}
+            tasks={allTasks}
             onEdit={handleEditTask}
-            onDelete={handleDeleteTask}
             isLoading={isTableLoading}
         />
 
@@ -214,20 +229,11 @@ const TaskManagement = () => {
           <Pagination
               current={currentPage}
               pageSize={itemsPerPage}
-              total={filteredTasks.length}
+              total={allTasks.length}
               onChange={handlePageChange}
               showSizeChanger={false}
           />
         </div>
-
-        {isFormOpen && (
-            <TaskForm
-                isFormOpen={isFormOpen}
-                toggleModal={toggleModal}
-                isEditing={false}
-                task={editingTask}
-            />
-        )}
 
         {isEditFormOpen && (
             <TaskForm
@@ -235,15 +241,7 @@ const TaskManagement = () => {
                 toggleModal={toggleEditModal}
                 isEditing
                 task={editingTask}
-            />
-        )}
-
-        {isDeleteDialogOpen && (
-            <DeleteAlertModal
-                isFormOpen={isDeleteDialogOpen}
-                toggleModal={toggleDeleteModal}
-                confirmDelete={confirmDelete}
-                message="Are you sure you want to delete this task?"
+                getAllTasks={getAllTasks}
             />
         )}
 

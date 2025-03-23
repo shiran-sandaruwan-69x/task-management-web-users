@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {Dropdown, Menu, Button, Avatar, MenuProps} from "antd";
 import {LogOut} from "lucide-react";
+import {axiosApi} from "@/services/axios_instances.ts";
+import {SignInResType} from "@/components/common-types/AuthTypes.ts";
 interface AdminDashboardProps {
     user?: {
         name: string;
@@ -14,21 +16,22 @@ interface AdminDashboardProps {
 
 type MenuItem = Required<MenuProps>["items"][number];
 
-const Header = ({ user: propUser, sidebarCollapsed,headerText}: AdminDashboardProps) => {
-    const [user, setUser] = useState(propUser);
+const Header = ({sidebarCollapsed,headerText}: AdminDashboardProps) => {
+    const [user, setUser] = useState<SignInResType>(null);
     const navigate = useNavigate();
 
-    // Check if user is logged in and is admin
     useEffect(() => {
         const savedUser = localStorage.getItem("user");
         if (savedUser) {
-            const parsedUser = JSON.parse(savedUser);
+            const parsedUser:SignInResType = JSON.parse(savedUser);
+            axiosApi.defaults.headers.common.Authorization = `Bearer ${parsedUser?.token}`;
             setUser(parsedUser);
         }
     }, []);
 
     const handleLogout = () => {
         localStorage.removeItem("user");
+        axiosApi.defaults.headers.common.Authorization = "";
         navigate("/auth/login");
     };
 
@@ -44,18 +47,18 @@ const Header = ({ user: propUser, sidebarCollapsed,headerText}: AdminDashboardPr
     ];
 
     return (
-        <header style={{ backgroundColor: "#fff", borderBottom: "1px solid #f0f0f0", padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <h1 style={{ fontSize: "20px", fontWeight: "600", margin: 0 }}>{headerText}</h1>
+        <header className="bg-white border-b border-[#f0f0f0] p-[16px_24px] flex items-center justify-between">
+            <h1 className="text-[20px] font-semibold m-0">{headerText}</h1>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <div className="flex items-center gap-[16px]">
                 {/* User menu */}
                 <Dropdown menu={{ items: menuItems }} trigger={["click"]}>
-                    <Button type="text" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <Avatar src="/user.jpg" alt={user?.name} size="default">
-                            {user?.name}
+                    <Button type="text" className="flex items-center gap-[8px]">
+                        <Avatar src="/user.jpg" alt={user?.user?.firstName} size="default">
+                            {user?.user?.firstName}
                         </Avatar>
                         {!sidebarCollapsed && (
-                            <span style={{ fontSize: "14px", fontWeight: "500" }}>{user?.name}</span>
+                            <span className="text-[14px] font-[500]">{user?.user?.firstName}</span>
                         )}
                     </Button>
                 </Dropdown>

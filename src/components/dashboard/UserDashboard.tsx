@@ -1,25 +1,12 @@
 import React, { useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Sidebar from "@/layout/Sidebar";
-import TaskManagement from "../tasks/TaskManagement";
-import Header from "@/layout/Header.tsx";
+import TaskManagement from "../tasks/TaskManagement"
 import {CheckSquare, Users} from "lucide-react";
+import {navItemsTypes} from "@/components/common-types/AuthTypes.ts";
+import Header from "@/layout/Header.tsx";
 
-interface navItemsTypes {
-  title?:string;
-  icon?:React.ReactElement;
-  path?:string;
-}
-
-interface UserDashboardProps {
-  user?: {
-    name: string;
-    email: string;
-    avatar?: string;
-  };
-}
-
-const UserDashboard = ({ user:propUser }: UserDashboardProps = {}) => {
+const UserDashboard = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const navItems:navItemsTypes[] = [
@@ -41,7 +28,7 @@ const UserDashboard = ({ user:propUser }: UserDashboardProps = {}) => {
         <div className="flex-1 flex flex-col overflow-hidden">
 
           {/* Header */}
-          <Header user={propUser} sidebarCollapsed={sidebarCollapsed} headerText="Users Dashboard"/>
+          <Header sidebarCollapsed={sidebarCollapsed} headerText="Users Dashboard"/>
 
           {/* Main content */}
           <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
